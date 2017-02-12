@@ -1,0 +1,85 @@
+- hosts: targets
+  user: vagrant
+  become: true
+  tasks:
+  - name: Install libselinux-python
+    yum: name=libselinux-python state=present
+
+  - name: Install zip,unzip
+    yum: name=zip,unzip state=present
+
+  - name: SELinuxのDisable設定
+    selinux: state=disabled
+
+  - name: mkdir /opt/jvm
+    file: path=/opt/jvm state=directory
+
+  - name: Check exists jdk
+    stat: path=/opt/jvm/jdk1.8.0_121
+    register: jdk8
+
+  - name: unzip JDK 8
+    unarchive: src=assets/jdk-8u121-linux-x64.tar.gz dest=/opt/jvm/
+    when: not jdk8.stat.exists
+    environment:
+      LANG: C
+      LC_ALL: C
+      LC_MESSAGES: C
+
+  - name: alternatives java 8
+    alternatives:
+      name: java
+      link: /usr/bin/java
+      path: /opt/jvm/jdk1.8.0_121/jre/bin/java
+
+  - name: ln -s /opt/jvm/jdk1.8.0_121/jre /opt/jvm/jre
+    file: 
+      src: /opt/jvm/jdk1.8.0_121/jre
+      dest: /opt/jvm/jre
+      state: link
+
+  - name: chown -R aimstar:aimstar /opt/jvm
+    file:
+      path: /opt/jvm
+      recurse: yes
+      owner: vagrant
+
+  - name: mkdir /opt/tomcat
+    file: path=/opt/tomcat state=directory
+
+  - name: Check exists tomcat
+    stat: path=/opt/tomcat/apache-tomcat-7.0.75
+    register: tm
+
+  - name: unzip Tomcat
+    unarchive: src=assets/apache-tomcat-7.0.75.zip dest=/opt/tomcat/
+    when: not tm.stat.exists
+    environment:
+      LANG: C
+      LC_ALL: C
+      LC_MESSAGES: C
+
+  - name: mkdir /opt/tomcat/conf/Catalina/localhost
+    file: path=/opt/tomcat/conf/Catalina/localhost state=directory
+
+  - name: chown -R aimstar:aimstar /opt/tomcat
+    file:
+      path: /opt/tomcat
+      recurse: yes
+      owner: vagrant
+
+  - name: find *.sh
+    shell: find /opt/tomcat/apache-tomcat-7.0.75/bin/*.sh
+    register: sh1
+
+#デバッグ用
+#  - debug: var=sh1.stdout_lines
+
+  - name: chmod +x *.sh
+    file: path={{item}} mode="u+x,g+x,o+x"
+    with_items: "{{ sh1.stdout_lines }}"
+
+  - name: .bash_profileを修正
+    lineinfile:
+      path: /tmp/testfile
+      line: '192.168.1.99 foo.lab.net foo'
